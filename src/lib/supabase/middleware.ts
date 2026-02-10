@@ -60,20 +60,26 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Admin routes are already protected below...
+    // Admin routes are already protected below...
 
-  // Role-based protection for /admin
-  if (pathname.startsWith('/admin')) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user?.id)
-      .single()
+    // Role-based protection for /admin
+    if (pathname.startsWith('/admin')) {
+      if (!user) {
+        const url = new URL('/auth/login', request.url)
+        url.searchParams.set('next', pathname)
+        return NextResponse.redirect(url)
+      }
 
-    if (!profile || profile.role !== 'admin') {
-      return NextResponse.redirect(new URL('/', request.url))
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile || profile.role !== 'admin') {
+        return NextResponse.redirect(new URL('/', request.url))
+      }
     }
-  }
 
   return supabaseResponse
 }
