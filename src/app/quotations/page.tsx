@@ -33,10 +33,49 @@ export default async function SalesQuotationsPage() {
     .eq('id', user.id)
     .single()
 
+  // Fetch quotations with proper filtering
+  let quotationsQuery = supabaseAdmin
+    .from('quotations')
+    .select(`
+      id,
+      quotation_number,
+      customer_name,
+      grand_total,
+      created_at,
+      pdf_url,
+      created_by,
+      profiles!created_by (full_name)
+    `)
+    .order('created_at', { ascending: false })
+
+  // Filter by user ID for non-admin users
+  if (profile?.role !== 'admin') {
+    quotationsQuery = quotationsQuery.eq('created_by', user.id)
+  }
+
+  const { data: quotations } = await quotationsQuery
+
+  // Transform the data to match the expected type
+  const transformedQuotations = (quotations || []).map((q: any) => ({
+    id: q.id,
+    quotation_number: q.quotation_number,
+    customer_name: q.customer_name,
+    grand_total: q.grand_total,
+    created_at: q.created_at,
+    pdf_url: q.pdf_url,
+    profiles: {
+      full_name: q.profiles?.[0]?.full_name || q.profiles?.full_name || 'Unknown'
+    }
+  }))
+
   return (
     <div className="min-h-screen bg-gray-50/50">
       <div className="mx-auto max-w-6xl p-8">
-        <QuotationsList user={profile} userId={user.id} />
+        <QuotationsList
+          user={profile}
+          userId={user.id}
+          initialQuotations={transformedQuotations}
+        />
       </div>
     </div>
   )

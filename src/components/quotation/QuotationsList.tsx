@@ -28,16 +28,19 @@ interface Quotation {
   }
 }
 
-export default function QuotationsList({ user, userId }: { user: any, userId?: string }) {
-  const [quotations, setQuotations] = useState<Quotation[]>([])
-  const [loading, setLoading] = useState(true)
+export default function QuotationsList({ user, userId, initialQuotations }: { user: any, userId?: string, initialQuotations?: Quotation[] }) {
+  const [quotations, setQuotations] = useState<Quotation[]>(initialQuotations || [])
+  const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [search, setSearch] = useState("")
-  
+
   const supabase = createClient()
 
   useEffect(() => {
-    fetchQuotations()
+    // Only fetch if no initial quotations provided
+    if (!initialQuotations || initialQuotations.length === 0) {
+      fetchQuotations()
+    }
   }, [userId])
 
   const fetchQuotations = async () => {
@@ -52,6 +55,7 @@ export default function QuotationsList({ user, userId }: { user: any, userId?: s
           grand_total,
           created_at,
           pdf_url,
+          created_by,
           profiles!created_by (full_name)
         `)
 
@@ -67,9 +71,23 @@ export default function QuotationsList({ user, userId }: { user: any, userId?: s
       }
 
       const { data, error } = await query.order("created_at", { ascending: false })
-      
+
       if (error) throw error
-      setQuotations(data as any)
+
+      // Transform the data
+      const transformed = (data || []).map((q: any) => ({
+        id: q.id,
+        quotation_number: q.quotation_number,
+        customer_name: q.customer_name,
+        grand_total: q.grand_total,
+        created_at: q.created_at,
+        pdf_url: q.pdf_url,
+        profiles: {
+          full_name: q.profiles?.[0]?.full_name || q.profiles?.full_name || 'Unknown'
+        }
+      }))
+
+      setQuotations(transformed)
     } catch (error: any) {
       toast.error(error.message)
     } finally {
@@ -94,7 +112,7 @@ export default function QuotationsList({ user, userId }: { user: any, userId?: s
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link 
+          <Link
             href={user?.role === 'admin' ? "/admin/quotations" : "/"}
             className="flex h-10 w-10 items-center justify-center rounded-xl border border-gray-100 bg-white text-gray-400 hover:text-black hover:shadow-sm transition-all"
           >
@@ -109,9 +127,9 @@ export default function QuotationsList({ user, userId }: { user: any, userId?: s
             </p>
           </div>
         </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
+        <Button
+          variant="outline"
+          size="sm"
           onClick={handleRefresh}
           disabled={refreshing || loading}
           className="rounded-xl gap-2 font-bold"
