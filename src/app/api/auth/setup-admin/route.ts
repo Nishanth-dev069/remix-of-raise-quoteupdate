@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
+
 export async function POST(request: Request) {
   try {
     const { email, password, name } = await request.json()
