@@ -1,6 +1,7 @@
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { AdminSidebar } from "@/components/admin/AdminSidebar"
 import { createClient } from "@/lib/supabase/server"
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { redirect } from "next/navigation"
 
 export default async function AdminLayout({
@@ -15,7 +16,19 @@ export default async function AdminLayout({
     redirect("/auth/login")
   }
 
-  const { data: profile } = await supabase
+  // Use admin client to check role and bypass RLS
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  )
+
+  const { data: profile } = await supabaseAdmin
     .from("profiles")
     .select("role")
     .eq("id", user.id)

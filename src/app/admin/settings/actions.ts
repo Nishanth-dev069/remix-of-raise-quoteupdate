@@ -1,9 +1,32 @@
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 
 export async function updateSettings(formData: FormData) {
   const supabase = await createClient()
-  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Unauthorized' }
+
+  // Verify admin role
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  )
+
+  const { data: profile } = await supabaseAdmin
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (profile?.role !== 'admin') return { error: 'Forbidden' }
+
   const company_name = formData.get('company_name') as string
   const address = formData.get('address') as string
   const phone = formData.get('phone') as string
@@ -32,7 +55,7 @@ export async function updateSettings(formData: FormData) {
     const { data: { publicUrl } } = supabase.storage
       .from('logos')
       .getPublicUrl(filePath)
-    
+
     company_logo = publicUrl
   }
 

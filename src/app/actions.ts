@@ -1,13 +1,36 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
 
 export async function saveQuotation(data: any) {
   const supabase = await createClient()
-  
+
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Unauthorized' }
+
+  // Verify user has sales or admin role
+  const supabaseAdmin = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  )
+
+  const { data: profile } = await supabaseAdmin
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile || (profile.role !== 'admin' && profile.role !== 'sales')) {
+    return { error: 'Forbidden' }
+  }
 
   // Get the last quotation number for sequential numbering
   const { data: lastQuotation } = await supabase
@@ -58,9 +81,9 @@ export async function saveQuotation(data: any) {
 
 export async function uploadQuotationPDF(fileName: string, blob: Blob) {
   const supabase = await createClient()
-  
+
   const filePath = `quotations/${fileName}`
-  
+
   const { error: uploadError } = await supabase.storage
     .from('quotations_docs') // I need to create this bucket
     .upload(filePath, blob, { contentType: 'application/pdf' })
@@ -70,6 +93,6 @@ export async function uploadQuotationPDF(fileName: string, blob: Blob) {
   const { data: { publicUrl } } = supabase.storage
     .from('quotations_docs')
     .getPublicUrl(filePath)
-  
+
   return { publicUrl }
 }
